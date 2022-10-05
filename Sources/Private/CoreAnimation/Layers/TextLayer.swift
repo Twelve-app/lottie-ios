@@ -2,6 +2,7 @@
 // Copyright © 2022 Airbnb Inc. All rights reserved.
 
 import QuartzCore
+import UIKit
 
 /// The `CALayer` type responsible for rendering `TextLayer`s
 final class TextLayer: BaseCompositionLayer {
@@ -68,8 +69,30 @@ final class TextLayer: BaseCompositionLayer {
         The Core Animation rendering engine currently doesn't support text animators.
         """)
     }
+      
+      let textString = context.textProvider.textFor(keypathName: context.layerName, sourceText: text.text)
+        
+      var fontSize = CGFloat(text.fontSize)
 
-    renderLayer.font = context.fontProvider.fontFor(family: text.fontFamily, size: CGFloat(text.fontSize))
+      if let size = text.textFrameSize?.sizeValue, text.textResize ?? false {
+        let minimumFontSize = CGFloat(text.minimumFontSize ?? 5)
+        var isFitting = false
+        while !isFitting && fontSize > minimumFontSize {
+            let boundingRect = CGSize(width: .greatestFiniteMagnitude, height: size.height)
+            guard let font = UIFont(name: text.fontFamily, size: fontSize) else { break }
+
+            let boundingBox = textString.boundingRect(with: boundingRect, options: .usesLineFragmentOrigin, attributes: [.font: font], context: nil)
+
+            let width = ceil(boundingBox.width)
+            if width < size.width {
+                isFitting = true
+            } else {
+                fontSize -= 1
+            }
+        }
+      }
+        
+      renderLayer.font = context.fontProvider.fontFor(family: text.fontFamily, size: CGFloat(fontSize))
 
     renderLayer.alignment = text.justification.textAlignment
     renderLayer.lineHeight = CGFloat(text.lineHeight)

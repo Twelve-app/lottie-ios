@@ -118,8 +118,8 @@ final class TextCompositionLayer: CompositionLayer {
 
     if let size = text.textFrameSize?.sizeValue, text.textResize ?? false {
         let minimumFontSize = CGFloat(text.minimumFontSize ?? 5)
-        var isFeatting = false
-        while !isFeatting && fontSize > minimumFontSize {
+        var isFitting = false
+        while !isFitting && fontSize > minimumFontSize {
             let boundingRect = CGSize(width: .greatestFiniteMagnitude, height: size.height)
             guard let font = UIFont(name: text.fontFamily, size: fontSize) else { break }
             
@@ -127,7 +127,7 @@ final class TextCompositionLayer: CompositionLayer {
             
             let width = ceil(boundingBox.width)
             if width < size.width {
-                isFeatting = true
+                isFitting = true
             } else {
                 fontSize -= 1
             }
