@@ -135,27 +135,29 @@ final class TextCompositionLayer: CompositionLayer {
     let tracking = (CGFloat(text.fontSize) * (rootNode?.textOutputNode.tracking ?? CGFloat(text.tracking))) / 1000.0
     let matrix = rootNode?.textOutputNode.xform ?? CATransform3DIdentity
     
-    let _textString = textProvider.text(for: AnimationKeypath(keypath: keypathName), sourceText: text.text)
-    var fontSize = CGFloat(text.fontSize)
-    if let size = text.textFrameSize?.sizeValue, text.textResize ?? false {
-      let minimumFontSize = CGFloat(text.minimumFontSize ?? 5)
-      var isFitting = false
-      while !isFitting && fontSize > minimumFontSize {
-          let boundingRect = CGSize(width: .greatestFiniteMagnitude, height: size.height)
-          guard let font = UIFont(name: text.fontFamily, size: fontSize) else { break }
+    if let _textString = textProvider.text(for: AnimationKeypath(keypath: keypathName), sourceText: text.text) {
+      var fontSize = CGFloat(text.fontSize)
+      if let size = text.textFrameSize?.sizeValue, text.textResize ?? false {
+        let minimumFontSize = CGFloat(text.minimumFontSize ?? 5)
+        var isFitting = false
+        while !isFitting && fontSize > minimumFontSize {
+            let boundingRect = CGSize(width: .greatestFiniteMagnitude, height: size.height)
+            guard let font = UIFont(name: text.fontFamily, size: fontSize) else { break }
 
-          let boundingBox = textString.boundingRect(with: boundingRect, options: .usesLineFragmentOrigin, attributes: [.font: font], context: nil)
+            let boundingBox = _textString.boundingRect(with: boundingRect, options: .usesLineFragmentOrigin, attributes: [.font: font], context: nil)
 
-          let width = ceil(boundingBox.width)
-          if width < size.width {
-              isFitting = true
-          } else {
-              fontSize -= 1
-          }
+            let width = ceil(boundingBox.width)
+            if width < size.width {
+                isFitting = true
+            } else {
+                fontSize -= 1
+            }
+        }
       }
+      textLayer.font = fontProvider.fontFor(family: text.fontFamily, size: fontSize)
+    } else {
+      textLayer.font = fontProvider.fontFor(family: text.fontFamily, size: CGFloat(text.fontSize))
     }
-
-    let ctFont = fontProvider.fontFor(family: text.fontFamily, size: fontSize)
 
     let start = rootNode?.textOutputNode.start.flatMap { Int($0) }
     let end = rootNode?.textOutputNode.end.flatMap { Int($0) }
@@ -164,7 +166,6 @@ final class TextCompositionLayer: CompositionLayer {
 
     // Set all of the text layer options
     textLayer.text = textString
-    textLayer.font = ctFont
     textLayer.alignment = text.justification.textAlignment
     textLayer.lineHeight = CGFloat(text.lineHeight)
     textLayer.tracking = tracking
