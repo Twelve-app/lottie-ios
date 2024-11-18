@@ -2,6 +2,7 @@
 // Copyright © 2022 Airbnb Inc. All rights reserved.
 
 import QuartzCore
+import UIKit
 
 /// The `CALayer` type responsible for rendering `TextLayer`s
 final class TextLayer: BaseCompositionLayer {
@@ -44,9 +45,19 @@ final class TextLayer: BaseCompositionLayer {
       context: textAnimationContext,
       description: "text layer text")
 
-    renderLayer.text = context.textProvider.textFor(
-      keypathName: textAnimationContext.currentKeypath.fullPath,
-      sourceText: sourceText.text)
+    // Prior to Lottie 4.3.0 the Core Animation rendering engine always just used `LegacyAnimationTextProvider`
+    // but incorrectly called it with the full keypath string, unlike the Main Thread rendering engine
+    // which only used the last component of the keypath. Starting in Lottie 4.3.0 we use `AnimationKeypathTextProvider`
+    // instead if implemented.
+    if let keypathTextValue = context.textProvider.text(for: textAnimationContext.currentKeypath, sourceText: sourceText.text) {
+      renderLayer.text = keypathTextValue
+    } else if let legacyTextProvider = context.textProvider as? LegacyAnimationTextProvider {
+      renderLayer.text = legacyTextProvider.textFor(
+        keypathName: textAnimationContext.currentKeypath.fullPath,
+        sourceText: sourceText.text)
+    } else {
+      renderLayer.text = sourceText.text
+    }
 
     renderLayer.sizeToFit()
   }
@@ -69,7 +80,31 @@ final class TextLayer: BaseCompositionLayer {
         """)
     }
 
-    renderLayer.font = context.fontProvider.fontFor(family: text.fontFamily, size: CGFloat(text.fontSize))
+    if let textString = context.textProvider.text(for: AnimationKeypath(keypath: context.layerName), sourceText: text.text) {
+          var fontSize = CGFloat(text.fontSize)
+
+          if let size = text.textFrameSize?.sizeValue, text.textResize ?? false {
+              let minimumFontSize = CGFloat(text.minimumFontSize ?? 5)
+              var isFitting = false
+              while !isFitting && fontSize > minimumFontSize {
+                  let boundingRect = CGSize(width: .greatestFiniteMagnitude, height: size.height)
+                  guard let font = UIFont(name: text.fontFamily, size: fontSize) else { break }
+
+                  let boundingBox = textString.boundingRect(with: boundingRect, options: .usesLineFragmentOrigin, attributes: [.font: font], context: nil)
+
+                  let width = ceil(boundingBox.width)
+                  if width < size.width {
+                      isFitting = true
+                  } else {
+                      fontSize -= 1
+                  }
+              }
+          }
+
+          renderLayer.font = context.fontProvider.fontFor(family: text.fontFamily, size: CGFloat(fontSize))
+    } else {
+        renderLayer.font = context.fontProvider.fontFor(family: text.fontFamily, size: CGFloat(text.fontSize))
+    }
 
     renderLayer.alignment = text.justification.textAlignment
     renderLayer.lineHeight = CGFloat(text.lineHeight)

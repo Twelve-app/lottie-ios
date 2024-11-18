@@ -5,8 +5,6 @@
 //  Created by Brandon Withrow on 1/9/19.
 //
 
-import Foundation
-
 // MARK: - TextJustification
 
 enum TextJustification: Int, Codable {
@@ -27,7 +25,7 @@ final class TextDocument: Codable, DictionaryInitializable, AnyInitializable {
     fontFamily = try dictionary.value(for: CodingKeys.fontFamily)
     let justificationValue: Int = try dictionary.value(for: CodingKeys.justification)
     guard let justification = TextJustification(rawValue: justificationValue) else {
-      throw InitializableError.invalidInput
+      throw InitializableError.invalidInput()
     }
     self.justification = justification
     tracking = try dictionary.value(for: CodingKeys.tracking)
@@ -55,11 +53,13 @@ final class TextDocument: Codable, DictionaryInitializable, AnyInitializable {
     } else {
       textFrameSize = nil
     }
+    textResize = try? dictionary.value(for: CodingKeys.textResize)
+    minimumFontSize = try? dictionary.value(for: CodingKeys.minimumFontSize)
   }
 
   convenience init(value: Any) throws {
     guard let dictionary = value as? [String: Any] else {
-      throw InitializableError.invalidInput
+      throw InitializableError.invalidInput()
     }
     try self.init(dictionary: dictionary)
   }
@@ -102,6 +102,10 @@ final class TextDocument: Codable, DictionaryInitializable, AnyInitializable {
   let textFramePosition: LottieVector3D?
 
   let textFrameSize: LottieVector3D?
+    
+  let textResize: Bool?
+
+  let minimumFontSize: Int?
 
   // MARK: Private
 
@@ -119,5 +123,7 @@ final class TextDocument: Codable, DictionaryInitializable, AnyInitializable {
     case strokeOverFill = "of"
     case textFramePosition = "ps"
     case textFrameSize = "sz"
+    case textResize = "trf_yubo"
+    case minimumFontSize = "mfs_yubo"
   }
 }

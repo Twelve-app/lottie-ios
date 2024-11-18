@@ -39,7 +39,7 @@ public final class DotLottieFile {
   // MARK: Internal
 
   /// Image provider for animations
-  private(set) var imageProvider: AnimationImageProvider?
+  private(set) var imageProvider: DotLottieImageProvider?
 
   /// Animations folder url
   lazy var animationsUrl: URL = fileUrl.appendingPathComponent("\(DotLottieFile.animationsFolderName)")
@@ -55,10 +55,10 @@ public final class DotLottieFile {
 
   /// The `LottieAnimation` and `DotLottieConfiguration` for the given animation ID in this file
   func animation(for id: String? = nil) -> DotLottieFile.Animation? {
-    if let id = id {
-      return animations.first(where: { $0.configuration.id == id })
+    if let id {
+      animations.first(where: { $0.configuration.id == id })
     } else {
-      return animations.first
+      animations.first
     }
   }
 
@@ -110,9 +110,9 @@ public final class DotLottieFile {
       let animation = try dotLottieAnimation.animation(url: animationsUrl)
       let configuration = DotLottieConfiguration(
         id: dotLottieAnimation.id,
-        imageProvider: imageProvider,
         loopMode: dotLottieAnimation.loopMode,
-        speed: dotLottieAnimation.animationSpeed)
+        speed: dotLottieAnimation.animationSpeed,
+        dotLottieImageProvider: imageProvider)
 
       return DotLottieFile.Animation(
         animation: animation,
@@ -144,3 +144,11 @@ extension String {
     (self as NSString).deletingPathExtension
   }
 }
+
+// MARK: - DotLottieFile + Sendable
+
+// Mark `DotLottieFile` as `@unchecked Sendable` to allow it to be used when strict concurrency is enabled.
+// In the future, it may be necessary to make changes to the internal implementation of `DotLottieFile`
+// to make it truly thread-safe.
+// swiftlint:disable:next no_unchecked_sendable
+extension DotLottieFile: @unchecked Sendable { }

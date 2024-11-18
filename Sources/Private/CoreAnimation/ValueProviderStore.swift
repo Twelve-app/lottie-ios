@@ -40,8 +40,13 @@ final class ValueProviderStore {
     valueProviders.append((keypath: keypath, valueProvider: valueProvider))
   }
 
-  // Retrieves the custom value keyframes for the given property,
-  // if an `AnyValueProvider` was registered for the given keypath.
+  /// Removes all ValueProviders for the given `AnimationKeypath`
+  func removeValueProvider(for keypath: AnimationKeypath) {
+    valueProviders.removeAll(where: { $0.keypath.matches(keypath) })
+  }
+
+  /// Retrieves the custom value keyframes for the given property,
+  /// if an `AnyValueProvider` was registered for the given keypath.
   func customKeyframes<Value>(
     of customizableProperty: CustomizableProperty<Value>,
     for keypath: AnimationKeypath,
@@ -73,9 +78,11 @@ final class ValueProviderStore {
 
     // Convert the type-erased keyframe values using this `CustomizableProperty`'s conversion closure
     let typedKeyframes = typeErasedKeyframes.compactMap { typeErasedKeyframe -> Keyframe<Value>? in
-      guard let convertedValue = customizableProperty.conversion(typeErasedKeyframe.value) else {
+      guard let convertedValue = customizableProperty.conversion(typeErasedKeyframe.value, anyValueProvider) else {
         logger.assertionFailure("""
-          Could not convert value of type \(type(of: typeErasedKeyframe.value)) to expected type \(Value.self)
+          Could not convert value of type \(type(of: typeErasedKeyframe.value)) from \(anyValueProvider) to expected type \(
+          Value
+          .self)
           """)
         return nil
       }
@@ -113,9 +120,9 @@ extension AnyValueProviderStorage {
   var isSupportedByCoreAnimationRenderingEngine: Bool {
     switch self {
     case .singleValue, .keyframes:
-      return true
+      true
     case .closure:
-      return false
+      false
     }
   }
 }

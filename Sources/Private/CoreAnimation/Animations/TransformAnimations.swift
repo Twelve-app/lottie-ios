@@ -6,7 +6,7 @@ import QuartzCore
 // MARK: - TransformModel
 
 /// This protocol mirrors the interface of `Transform`,
-/// but it also implemented by `ShapeTransform` to allow
+/// but is also implemented by `ShapeTransform` to allow
 /// both transform types to share the same animation implementation.
 protocol TransformModel {
   /// The anchor point of the transform.
@@ -213,7 +213,7 @@ extension CALayer {
     }
 
     // Lottie animation files express rotation in degrees
-    // (e.g. 90º, 180º, 360º) so we covert to radians to get the
+    // (e.g. 90º, 180º, 360º) so we convert to radians to get the
     // values expected by Core Animation (e.g. π/2, π, 2π)
 
     try addAnimation(
@@ -237,7 +237,7 @@ extension CALayer {
       keyframes: transformModel.rotationZ,
       value: { rotationDegrees in
         // Lottie animation files express rotation in degrees
-        // (e.g. 90º, 180º, 360º) so we covert to radians to get the
+        // (e.g. 90º, 180º, 360º) so we convert to radians to get the
         // values expected by Core Animation (e.g. π/2, π, 2π)
         rotationDegrees.cgFloatValue * .pi / 180
       },
@@ -253,6 +253,17 @@ extension CALayer {
     context: LayerAnimationContext)
     throws
   {
+    let requiresManualInterpolation =
+      // Core Animation doesn't animate skew changes properly. If the skew value
+      // changes over the course of the animation then we have to manually
+      // compute the `CATransform3D` for each frame individually.
+      transformModel.hasSkewAnimation
+      // `addAnimation` requires that we use an `Interpolatable` value, but we can't interpolate a `CATransform3D`.
+      // Since this is only necessary when using `complexTimeRemapping`, we can avoid this by manually interpolating
+      // when `context.mustUseComplexTimeRemapping` is true and just returning a `Hold` container.
+      // Since our keyframes are already manually interpolated, they won't need to be interpolated again.
+      || context.mustUseComplexTimeRemapping
+
     let combinedTransformKeyframes = Keyframes.combined(
       transformModel.anchorPoint,
       transformModel._position ?? KeyframeGroup(LottieVector3D(x: 0.0, y: 0.0, z: 0.0)),
@@ -264,18 +275,19 @@ extension CALayer {
       transformModel.rotationZ,
       transformModel._skew ?? KeyframeGroup(LottieVector1D(0)),
       transformModel._skewAxis ?? KeyframeGroup(LottieVector1D(0)),
+      requiresManualInterpolation: requiresManualInterpolation,
       makeCombinedResult: {
         anchor, position, positionX, positionY, scale, rotationX, rotationY, rotationZ, skew, skewAxis
-          -> CATransform3D in
+          -> Hold<CATransform3D> in
 
-        let transformPosition: CGPoint
-        if transformModel._positionX != nil, transformModel._positionY != nil {
-          transformPosition = CGPoint(x: positionX.cgFloatValue, y: positionY.cgFloatValue)
-        } else {
-          transformPosition = position.pointValue
-        }
+        let transformPosition: CGPoint =
+          if transformModel._positionX != nil, transformModel._positionY != nil {
+            CGPoint(x: positionX.cgFloatValue, y: positionY.cgFloatValue)
+          } else {
+            position.pointValue
+          }
 
-        return CATransform3D.makeTransform(
+        let transform = CATransform3D.makeTransform(
           anchor: anchor.pointValue,
           position: transformPosition,
           scale: scale.sizeValue,
@@ -284,12 +296,14 @@ extension CALayer {
           rotationZ: rotationZ.cgFloatValue,
           skew: skew.cgFloatValue,
           skewAxis: skewAxis.cgFloatValue)
+
+        return Hold(value: transform)
       })
 
     try addAnimation(
       for: .transform,
       keyframes: combinedTransformKeyframes,
-      value: { $0 },
+      value: { $0.value },
       context: context)
   }
 
@@ -299,8 +313,8 @@ extension TransformModel {
   /// Whether or not this transform has a non-zero skew value
   var hasSkew: Bool {
     guard
-      let _skew = _skew,
-      let _skewAxis = _skewAxis,
+      let _skew,
+      let _skewAxis,
       !_skew.keyframes.isEmpty,
       !_skewAxis.keyframes.isEmpty
     else {
@@ -308,6 +322,18 @@ extension TransformModel {
     }
 
     return _skew.keyframes.contains(where: { $0.value.cgFloatValue != 0 })
+  }
+
+  /// Whether or not this transform has a non-zero skew value which animates
+  var hasSkewAnimation: Bool {
+    guard
+      hasSkew,
+      let _skew,
+      let _skewAxis
+    else { return false }
+
+    return _skew.keyframes.count > 1
+      || _skewAxis.keyframes.count > 1
   }
 
   /// Whether or not this `TransformModel` has any negative X scale values
